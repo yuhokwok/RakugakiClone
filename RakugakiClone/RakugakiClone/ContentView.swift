@@ -2,21 +2,30 @@
 //  ContentView.swift
 //  RakugakiClone
 //
-//  Created by Yu Ho Kwok on 11/19/24.
+//  Created by itst on 9/1/2025.
 //
 
 import SwiftUI
 
 struct ContentView: View {
+    @State var mode : AppMode = .start
     var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
-            VCContainer()
+        if mode == .start || mode == .instruct {
+            StartView(mode: $mode)
+                .sheet(isPresented: Binding(get: {
+                    return mode == .instruct
+                }, set: {
+                    if $0 == false { mode = .start } else { mode = .instruct}
+                }), content: {
+                    InstructionView()
+                })
+        } else if mode == .playing {
+            PlayingView(mode: $mode)
+                .transition(.scale(0.5).combined(with: .opacity))
+        } else if mode == .idea {
+            IdeaView(mode: $mode)
+                .transition(.move(edge: .bottom))
         }
-        .padding()
     }
 }
 

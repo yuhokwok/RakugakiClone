@@ -7,8 +7,16 @@
 
 import SwiftUI
 
+enum AppMode {
+    case start
+    case playing
+    case instruct
+    case idea
+}
+
 @main
 struct RakugakiCloneApp: App {
+
     var body: some Scene {
         WindowGroup {
             ContentView()

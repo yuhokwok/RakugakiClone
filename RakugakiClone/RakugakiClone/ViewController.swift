@@ -16,9 +16,6 @@ struct VCContainer : UIViewControllerRepresentable {
     }
     
     typealias UIViewControllerType = ViewController
-    
-    
-    
 }
 
 class ViewController: UIViewController, ARSessionDelegate, ARSCNViewDelegate {
@@ -27,6 +24,8 @@ class ViewController: UIViewController, ARSessionDelegate, ARSCNViewDelegate {
     
     //@IBOutlet weak var scnView: ARSCNView!
     var scnView: ARSCNView!
+    
+    var useImageView = false
     
     var imgView : UIImageView?
     // 輪郭描画用
@@ -78,7 +77,7 @@ class ViewController: UIViewController, ARSessionDelegate, ARSCNViewDelegate {
         
         self.imgView = UIImageView(frame: CGRect(x: 0, y: 0, width: 150, height: 150))
         self.view.addSubview(self.imgView!)
-        
+        self.imgView?.isHidden = !useImageView
         
         // シーンの設定
         self.setupScene()
@@ -88,6 +87,12 @@ class ViewController: UIViewController, ARSessionDelegate, ARSCNViewDelegate {
         let configuration = ARWorldTrackingConfiguration()
         configuration.planeDetection = [.horizontal]
         self.scnView.session.run(configuration, options: [.removeExistingAnchors, .resetTracking])
+    }
+    
+    override func viewDidDisappear(_ animated: Bool) {
+        self.scnView.delegate = nil
+        self.scnView.session.pause()
+        super.viewDidDisappear(animated)
     }
 
     // アンカーが追加された
@@ -116,9 +121,19 @@ class ViewController: UIViewController, ARSessionDelegate, ARSCNViewDelegate {
     // ARフレームが更新された
     func session(_ session: ARSession, didUpdate frame: ARFrame) {
         // キャプチャ画像をスクリーンで見える範囲に切り抜く
-        let screenImage = cropScreenImageFromCapturedImage(frame: frame)
+        guard let screenImage = cropScreenImageFromCapturedImage(frame: frame) else {
+            return
+        }
+        
         // 一番外側の輪郭を取得
-        guard let contour = getFirstOutsideContour(screenImage: screenImage) else { return }
+        guard let contour = getFirstOutsideContour(screenImage: screenImage) else {
+            //remove path if no path detected
+            if let layer = self.contourPathLayer {
+                layer.removeFromSuperlayer()
+                self.contourPathLayer = nil
+            }
+            return
+        }
         // UIKitの座標系のCGPathを取得
         guard let path = getCGPathInUIKitSpace(contour: contour) else { return }
         
@@ -178,6 +193,12 @@ class ViewController: UIViewController, ARSessionDelegate, ARSCNViewDelegate {
 
 // MARK: - 輪郭検出関連
 
+extension CGSize {
+    var area : CGFloat {
+        return self.width * self.height
+    }
+}
+
 extension ViewController {
     
     private func getFirstOutsideContour(screenImage: CIImage) -> VNContour? {
@@ -191,30 +212,50 @@ extension ViewController {
         contourRequest.detectsDarkOnLight = true                    // 明るい背景で暗いオブジェクトを検出
         try? handler.perform([contourRequest])
         // 検出結果取得
+        
+
+        
+        
+//        guard let observation = contourRequest.results?.max(by: {
+//            $0.normalizedPath.boundingBoxOfPath.size.area < $1.normalizedPath.boundingBoxOfPath.size.area
+//        }) else { return nil }
+        
+
         guard let observation = contourRequest.results?.first as? VNContoursObservation else { return nil }
+        
+        
         // トップレベルの輪郭のうち、輪郭の座標数が一番多いパスを見つける
         
-        let outSideContour = observation
-            .topLevelContours.filter({ $0.normalizedPoints.reduce(true, { $0 && ($1.x > 0.05 && $1.y > 0.05 && $1.x < 0.95 && $1.y < 0.95) }) })
-            .max(by: { SKPhysicsBody(polygonFrom: $0.normalizedPath).area <  SKPhysicsBody(polygonFrom: $1.normalizedPath).area })
-            //.max(by: { $0.normalizedPoints.count < $1.normalizedPoints.count })
-        //$0.normalizedPoints.contains(where: { $0.x > 0.1 && $0.y > 0.1 && $0.x < 0.9 && $0.y < 0.9 })
+        let outSideContours = observation
+            .topLevelContours
+            .filter({ $0.normalizedPoints.reduce(true, { $0 && ($1.x > 0.05 && $1.y > 0.05 && $1.x < 0.95 && $1.y < 0.95) }) })
         
+        let outSideContour = outSideContours
+            .max(by: { $0.normalizedPath.boundingBox.size.area < $1.normalizedPath.boundingBox.size.area })
         
+//        let map = outSideContours.reduce("", { "\($0) \($1.normalizedPath.boundingBoxOfPath.size.area)" })
+//        print("the result: \(map)")
         
+            
         //let outSideContour = observation.topLevelContours.max(by: { $0.normalizedPoints.count < $1.normalizedPoints.count })
         //print("\(outSideContour?.normalizedPath)")
         //if let contour = try? outSideContour?.polygonApproximation(epsilon: 30) {
         if let contour = outSideContour {
-            //return contour.polygonApproximation(epsilon: 30)
-            print("area: \(SKPhysicsBody(polygonFrom: contour.normalizedPath).area )")
-            return contour
+            if contour.normalizedPath.boundingBox.size.area > 0.04 {
+                return contour
+            } else {
+                return nil
+            }
         } else {
             return nil
         }
     }
     
-    private func cropScreenImageFromCapturedImage(frame: ARFrame) -> CIImage {
+    private func cropScreenImageFromCapturedImage(frame: ARFrame) -> CIImage? {
+
+        guard self.scnView.window != nil && self.scnView.window?.windowScene != nil else {
+            return nil
+        }
         
         let imageBuffer = frame.capturedImage
         // カメラキャプチャ画像をスクリーンサイズに変換
@@ -267,9 +308,11 @@ extension ViewController {
                                                              height: detectSize))
         
         
-        let img = context.createCGImage(croppedImage, from: croppedImage.extent)
-        let image = UIImage(cgImage: img!)
-        self.imgView?.image = image
+        if useImageView {
+            let img = context.createCGImage(croppedImage, from: croppedImage.extent)
+            let image = UIImage(cgImage: img!)
+            self.imgView?.image = image
+        }
         
         return croppedImage
     }
