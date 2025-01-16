@@ -20,7 +20,13 @@ struct VCContainer : UIViewControllerRepresentable {
 
 class ViewController: UIViewController, ARSessionDelegate, ARSCNViewDelegate {
 
+    static var shared : ViewController?
+    
+    var rakugakiArr : [Rakugaki] = []
+    
     let context = CIContext()
+    
+    var callback : ((Rakugaki) -> Void)?
     
     //@IBOutlet weak var scnView: ARSCNView!
     var scnView: ARSCNView!
@@ -63,10 +69,11 @@ class ViewController: UIViewController, ARSessionDelegate, ARSCNViewDelegate {
         CGPoint(x: 1.0, y: 1.0),    // 右下
     ]
     
-    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
-        print("press button")
-        self.pressButton(self)
-    }
+    
+//    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
+//        print("press button")
+//        self.pressButton(self)
+//    }
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -89,7 +96,14 @@ class ViewController: UIViewController, ARSessionDelegate, ARSCNViewDelegate {
         self.scnView.session.run(configuration, options: [.removeExistingAnchors, .resetTracking])
     }
     
+    
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        ViewController.shared = self
+    }
+    
     override func viewDidDisappear(_ animated: Bool) {
+        ViewController.shared = nil
         self.scnView.delegate = nil
         self.scnView.session.pause()
         super.viewDidDisappear(animated)
@@ -105,6 +119,8 @@ class ViewController: UIViewController, ARSessionDelegate, ARSCNViewDelegate {
             node.addChildNode(floorNode)
         }
     }
+    
+    
 
     // アンカーが更新された
     func renderer(_: SCNSceneRenderer, didUpdate node: SCNNode, for anchor: ARAnchor) {
@@ -120,6 +136,13 @@ class ViewController: UIViewController, ARSessionDelegate, ARSCNViewDelegate {
 
     // ARフレームが更新された
     func session(_ session: ARSession, didUpdate frame: ARFrame) {
+        
+        let origin = CGPoint(x: self.view.bounds.width/2 - self.detectSize/2,
+                             y: self.view.bounds.height/2 - self.detectSize/2)
+        if let leftTopWorldPosition = self.getWorldPosition(from: origin) {
+            print("okok")
+        }
+        
         // キャプチャ画像をスクリーンで見える範囲に切り抜く
         guard let screenImage = cropScreenImageFromCapturedImage(frame: frame) else {
             return
@@ -185,8 +208,14 @@ class ViewController: UIViewController, ARSessionDelegate, ARSCNViewDelegate {
         self.scnView.scene.rootNode.addChildNode(self.cornerMarker4)
     }
     
+    
+    func scan(callback: @escaping (Rakugaki) -> Void) {
+        self.callback = callback
+        isButtonPressed = true
+    }
+    
     // ジオメトリ化ボタンが押された
-    @IBAction func pressButton(_ sender: Any) {
+    @IBAction func pressButton(_ sender: Any?) {
         isButtonPressed = true
     }
 }
@@ -357,6 +386,15 @@ extension ViewController {
 
 extension ViewController {
     
+    func addNode(_ node : SCNNode) {
+        // 画面中央上の20cm上から落とす
+        let screenCenter = CGPoint(x: self.view.bounds.width/2, y: self.view.bounds.height/2 - 150)
+        guard var position = self.getWorldPosition(from: screenCenter) else { return }
+        position.y += 0.2
+        node.worldPosition = position
+        self.scnView.scene.rootNode.addChildNode(node)
+    }
+    
     private func drawContour3DModel(normalizedPath: CGPath, captureImage: CIImage) {
         // ベジェパスをもとにノードを生成
         guard let node = makeNode(from: normalizedPath, captureImage: captureImage) else { return }
@@ -517,13 +555,16 @@ extension ViewController {
         let node = SCNNode()
         node.position = SCNVector3(x: 0.0, y: 0.0, z: 0.0)
         
+        // print(geometryPath)
         // ベジェ曲線から3Dモデルを作成
         let pathShapeNode = makePathShapeNode(geometryPath: geometryPath)
         pathShapeNode.position = SCNVector3(x: 0.0, y: 0.0, z: 0.0)
         node.addChildNode(pathShapeNode)
         
+        let tuple =  makeShapeFaceNode(from: normalizedPath, captureImage: captureImage)
+        
         // 3Dモデルの表面ノードを作成
-        guard let shapeFaceNode = makeShapeFaceNode(from: normalizedPath, captureImage: captureImage) else { return nil }
+        guard let shapeFaceNode = tuple?.0 else { return nil }
         shapeFaceNode.eulerAngles = SCNVector3(x: Float.pi/2, y: 0, z: 0)
         shapeFaceNode.position = SCNVector3(0, 0.0, 0.0051) // 表面の位置になるように座標を調整
         node.addChildNode(shapeFaceNode)
@@ -531,6 +572,34 @@ extension ViewController {
         // ノードに物理判定情報を設定
         node.physicsBody = makeShapePhysicsBody(from: pathShapeNode.geometry)
         
+        if let callback = callback {
+            guard let image  = tuple?.1 else {
+                self.callback = nil
+                print("return node2")
+                return node
+            }
+            
+            guard let imageData = image.pngData(), let path = try? CodableBezierPath(path: geometryPath)  else {
+                self.callback = nil
+                print("return node1")
+                return node
+            }
+            
+            guard let leftTop = self.leftTop, let rightTop = self.rightTop,
+                  let leftBottom = self.leftBottom, let rightBottom = self.rightBottom else {
+                return node
+            }
+            
+            let rakugaki = Rakugaki(codableBezierPath:path,
+                                    imageData: imageData,
+                                    _leftTop: SIMD3<Float>(leftTop),
+                                    _leftBottom: SIMD3<Float>(leftBottom),
+                                    _rightTop: SIMD3<Float>(rightTop),
+                                    _rightBottom: SIMD3<Float>(rightBottom))
+            callback(rakugaki)
+            
+        }
+        print("return node")
         return node
     }
     
@@ -549,7 +618,7 @@ extension ViewController {
         return node
     }
     
-    private func makeShapeFaceNode(from normalizedPath: CGPath, captureImage: CIImage) -> SCNNode? {
+    private func makeShapeFaceNode(from normalizedPath: CGPath, captureImage: CIImage) -> (SCNNode?, UIImage?)? {
         // パスを塗りつぶす画像を生成
         var transform = CGAffineTransform(scaleX: detectSize, y: -detectSize)
         transform = transform.concatenating(CGAffineTransform(translationX: 0, y: detectSize))
@@ -584,7 +653,14 @@ extension ViewController {
         let textureNode = SCNNode()
         textureNode.geometry = makeShapeFaceGeometory(texture: texture)
 
-        return textureNode
+        let context = CIContext(options: nil)
+        guard let cgImage = context.createCGImage(texture, from: texture.extent) else {
+            return (textureNode, nil)
+        }
+        
+        let uiImage = UIImage(cgImage: cgImage)
+        return (textureNode, uiImage)
+        
     }
     
     private func makeShapeFaceGeometory(texture: CIImage) -> SCNGeometry? {
