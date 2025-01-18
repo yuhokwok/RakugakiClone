@@ -1,60 +1,17 @@
-
 //
-//  Rakugaki.swift
+//  Rakugaki+SCNNode.swift
 //  RakugakiClone
 //
-//  Created by Yu Ho Kwok on 1/14/25.
+//  Created by Yu Ho Kwok on 1/18/25.
 //
+
 import UIKit
 import SceneKit
 import RealityKit
 import ARKit
 import Vision
 
-struct RakugakiManager {
-    
-}
-
-struct Rakugaki : Identifiable, Codable {
-    
-    
-    var id : String = UUID().uuidString
-    //var path : UIBezierPath
-    var codableBezierPath : CodableBezierPath
-    var imageData : Data
-    
-    var _leftTop : SIMD3<Float>
-    var _leftBottom : SIMD3<Float>
-    var _rightTop : SIMD3<Float>
-    var _rightBottom : SIMD3<Float>
-    
-    var path : UIBezierPath? {
-        return try? codableBezierPath.toBezierPath()
-    }
-    
-    var texture : UIImage? {
-        return UIImage(data: imageData)
-    }
-    
-    var leftTop : SCNVector3 {
-        set { _leftTop = SIMD3<Float>(newValue)  }
-        get { _leftTop.scnVector3 }
-    }
-    
-    var leftBottom : SCNVector3 {
-        set { _leftBottom = SIMD3<Float>(newValue)  }
-        get { _leftBottom.scnVector3 }
-    }
-    
-    var rightTop : SCNVector3 {
-        set { _rightTop = SIMD3<Float>(newValue)  }
-        get { _rightTop.scnVector3 }
-    }
-    
-    var rightBottom : SCNVector3 {
-        set { _rightBottom = SIMD3<Float>(newValue)  }
-        get { _rightBottom.scnVector3 }
-    }
+extension Rakugaki {
     
     func makeNode() -> SCNNode? {
         
@@ -159,52 +116,4 @@ struct Rakugaki : Identifiable, Codable {
         return physicsBody
     }
     
-    
-}
-
-extension SIMD3<Float> {
-    var scnVector3 : SCNVector3 {
-        return SCNVector3(self.x, self.y, self.z)
-    }
-    init(_ scnVector3 : SCNVector3) {
-        self.init(x: scnVector3.x, y: scnVector3.y, z: scnVector3.z)
-    }
-}
-
-/// A simple wrapper around `UIBezierPath` that makes it Codable.
-/// Internally, it archives/unarchives a `UIBezierPath` via NSKeyedArchiver.
-struct CodableBezierPath: Codable {
-    private let archivedData: Data
-    
-    /// Initialize from an existing `UIBezierPath`.
-    init(path: UIBezierPath) throws {
-        // Archive the path.
-        // `requiringSecureCoding: false` is often used for older OS versions or non-secure archives.
-        // Adjust to `true` if you need secure coding throughout your app.
-        self.archivedData = try NSKeyedArchiver.archivedData(withRootObject: path,
-                                                             requiringSecureCoding: false)
-    }
-    
-    /// Reconstruct the `UIBezierPath` from archived data.
-    func toBezierPath() throws -> UIBezierPath {
-        guard let path = try NSKeyedUnarchiver
-                .unarchivedObject(ofClass: UIBezierPath.self, from: archivedData)
-        else {
-            throw NSError(domain: "CodableBezierPath", code: 1,
-                          userInfo: [NSLocalizedDescriptionKey: "Failed to unarchive UIBezierPath"])
-        }
-        return path
-    }
-    
-    // MARK: - Codable conformance
-    
-    init(from decoder: Decoder) throws {
-        let container = try decoder.singleValueContainer()
-        self.archivedData = try container.decode(Data.self)
-    }
-    
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.singleValueContainer()
-        try container.encode(archivedData)
-    }
 }

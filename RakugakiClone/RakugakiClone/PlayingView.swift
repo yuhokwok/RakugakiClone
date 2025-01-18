@@ -6,17 +6,23 @@
 //
 
 import SwiftUI
+import SceneKit
 
 struct PlayingView: View {
     @Binding var mode: AppMode
     @State var showTip  = true
     
     @State var rakugakiArr : [Rakugaki] = []
+    
+    @StateObject private var sceneController = SceneController()
+    
+    
     var body: some View {
         ZStack {
             VStack {
                 
                 HStack {
+
                     Spacer()
                     Button(action: {
                         withAnimation {
@@ -29,7 +35,7 @@ struct PlayingView: View {
                         }
                     }, label: { Text("Close") } )
                     .buttonStyle(.bordered)
-                } .padding(.horizontal)
+                } .padding()
                 
                 if showTip {
                     HStack {
@@ -39,7 +45,7 @@ struct PlayingView: View {
                     }
                 }
                 
-                ZStack {
+                ZStack (alignment: .bottomTrailing) {
 #if targetEnvironment(simulator)
                     
                     VStack {
@@ -54,106 +60,113 @@ struct PlayingView: View {
                     }
                     
 #else
-                    VCContainer()
+                    VCContainer(sceneController: sceneController)
 #endif
                     
                     
+                    VStack {
+
+                        HStack {
+                            
+                            JoystickView(onChange: {
+                                x, y in
+                                
+                                let currentPos = sceneController.spherePosition
+                                let newX = Float(x) * sceneController.movementSpeed //+ currentPos.x
+                                let newY : Float = 0
+                                //let newZ : Float = 0
+                                let newZ = Float(-y) * sceneController.movementSpeed
+                                sceneController.spherePosition = SCNVector3(newX, newY, newZ)
+                            })
+                            .frame(width: 100, height: 100)
+                            .padding()
+                            
+                            ScrollView (.horizontal) {
+                                HStack {
+                                    ForEach(rakugakiArr){
+                                        rakugaki in
+                                        
+                                        
+                                        if let image = rakugaki.texture {
+                                            
+                                            Button(action: {
+                                                if let node = rakugaki.makeNode() {
+                                                    ViewController.shared?.addNode(node)
+                                                }
+                                            }, label: {
+                                                
+                                                ZStack {
+                                                    Image(uiImage: image)
+                                                        .resizable()
+                                                        .scaledToFill()
+                                                        .frame(width: 100, height: 100)
+                                                }.frame(width: 100, height: 100)
+                                                    .background(.white)
+                                                    .clipShape(RoundedRectangle(cornerRadius: 15))
+                                                    .shadow(radius: 10)
+                                                
+                                            })
+                                            
+
+                                        } else {
+                                            Rectangle().frame(width: 100, height: 100)
+                                                .clipShape(RoundedRectangle(cornerRadius: 15))
+                                                .shadow(radius: 10)
+                                        }
+                                        
+                                        
+                                    }
+                                }
+                            }.contentMargins(20)
+                                .scrollIndicators(.hidden)
+                            
+                            
+                            
+                            Spacer()
+                            
+
+                            Button(action: {
+                                ViewController.shared?.scan(callback: {
+                                    r in
+                                    
+                                    rakugakiArr.append(r)
+                                })
+                                
+                                //ViewController.shared?.pressButton(nil)
+                            }, label: {
+                                Image(systemName: "viewfinder.circle.fill")
+                                    .font(.system(size: 50))
+                                    .foregroundStyle(.white)
+                                    .frame(width: 100, height: 100)
+                                    .background {
+                                        Circle()
+                                    }
+                            })
+                            
+                            Button(action: {
+                                //ViewController.shared?.pressButton(nil)
+                            }, label: {
+                                Image(systemName: "viewfinder.circle.fill")
+                                    .font(.system(size: 25))
+                                    .foregroundStyle(.white)
+                                    .frame(width: 50, height: 50)
+                                    .background {
+                                        Circle()
+                                    }
+                            }).padding()
+                        }
+                        .padding()
+                        
+                    }
                 }
                 .background(.black)
                 .animation(.default, value: showTip)
                 .clipShape(RoundedRectangle(cornerRadius: showTip ? 12 : 24))
                 .padding(showTip ? 20 : 5)
-                
-                
-                ScrollView (.horizontal) {
-                    HStack {
-                        ForEach(rakugakiArr){
-                            rakugaki in
-                            
-                            
-                            if let image = rakugaki.texture {
-                                
-                                Button(action: {
-                                    if let node = rakugaki.makeNode() {
-                                        ViewController.shared?.addNode(node)
-                                    }
-                                }, label: {
-                                    
-                                    ZStack {
-                                        Image(uiImage: image)
-                                            .resizable()
-                                            .scaledToFill()
-                                            .frame(width: 100, height: 100)
-                                    }.frame(width: 100, height: 100)
-                                        .background(.white)
-                                        .clipShape(RoundedRectangle(cornerRadius: 15))
-                                        .shadow(radius: 10)
-                                    
-                                })
-                                
-
-                            } else {
-                                Rectangle().frame(width: 100, height: 100)
-                                    .clipShape(RoundedRectangle(cornerRadius: 15))
-                                    .shadow(radius: 10)
-                            }
-                            
-                            
-                        }
-                    }
-                }.contentMargins(20)
-                    .scrollIndicators(.hidden)
-                
-                HStack {
-                    
-                    Button(action: {
-                        //ViewController.shared?.pressButton(nil)
-                    }, label: {
-                        Image(systemName: "viewfinder.circle.fill")
-                            .font(.system(size: 25))
-                            .foregroundStyle(.white)
-                            .frame(width: 50, height: 50)
-                            .background {
-                                Circle()
-                            }
-                    }).opacity(0)
-                        .padding()
-                    
-                    Button(action: {
-                        ViewController.shared?.scan(callback: {
-                            r in
-                            
-                            rakugakiArr.append(r)
-                        })
-                        
-                        //ViewController.shared?.pressButton(nil)
-                    }, label: {
-                        Image(systemName: "viewfinder.circle.fill")
-                            .font(.system(size: 50))
-                            .foregroundStyle(.white)
-                            .frame(width: 100, height: 100)
-                            .background {
-                                Circle()
-                            }
-                    })
-                    
-                    Button(action: {
-                        //ViewController.shared?.pressButton(nil)
-                    }, label: {
-                        Image(systemName: "viewfinder.circle.fill")
-                            .font(.system(size: 25))
-                            .foregroundStyle(.white)
-                            .frame(width: 50, height: 50)
-                            .background {
-                                Circle()
-                            }
-                    }).padding()
-                }
-                
             }
-            
 
         }
+            .ignoresSafeArea()
     }
 }
 

@@ -7,19 +7,29 @@ import UIKit
 import SpriteKit
 
 struct VCContainer : UIViewControllerRepresentable {
+    
+    @ObservedObject var sceneController: SceneController
+    
     func makeUIViewController(context: Context) -> ViewController {
         return ViewController()
     }
     
     func updateUIViewController(_ uiViewController: ViewController, context: Context) {
-        
+        if let target = uiViewController.target {
+            //target.position = target.position +  sceneController.spherePosition
+            target.physicsBody?.applyForce(sceneController.spherePosition, asImpulse: true)
+            
+        }
     }
     
     typealias UIViewControllerType = ViewController
 }
 
+
 class ViewController: UIViewController, ARSessionDelegate, ARSCNViewDelegate {
 
+    var target : SCNNode?
+    
     static var shared : ViewController?
     
     var rakugakiArr : [Rakugaki] = []
@@ -31,13 +41,13 @@ class ViewController: UIViewController, ARSessionDelegate, ARSCNViewDelegate {
     //@IBOutlet weak var scnView: ARSCNView!
     var scnView: ARSCNView!
     
-    var useImageView = false
+    var useImageView = true
     
     var imgView : UIImageView?
     // 輪郭描画用
     private var contourPathLayer: CAShapeLayer?
     // キャプチャ画像上の輪郭検出範囲
-    private let detectSize: CGFloat = 320.0
+    private let detectSize: CGFloat = 480.0
     // ３次元化ボタンが押下状態
     private var isButtonPressed = false
     // 床の厚さ(m)
@@ -327,7 +337,7 @@ extension ViewController {
         // ペンの線を強調。RGB各々について閾値より明るい色は 1.0 にする。
         let thresholdFilter = CIFilter.colorThreshold()
         thresholdFilter.inputImage = blurImage
-        thresholdFilter.threshold = 0.05
+        thresholdFilter.threshold = 0.5 //0.05
         guard let thresholdImage = thresholdFilter.outputImage else { return nil }
         // 検出範囲を画面の中心部分に限定する
         let screenImageSize = screenImage.extent    // CIMorphologyMinimumフィルタにより画像サイズと位置が変わってしまうので、オリジナル画像のサイズ・位置を基準にする
@@ -393,6 +403,9 @@ extension ViewController {
         position.y += 0.2
         node.worldPosition = position
         self.scnView.scene.rootNode.addChildNode(node)
+        
+        
+        self.target = node
     }
     
     private func drawContour3DModel(normalizedPath: CGPath, captureImage: CIImage) {
