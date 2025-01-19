@@ -20,7 +20,7 @@ struct ContentView: View {
                     InstructionView()
                 })
         } else if mode == .playing {
-            PlayingView(mode: $mode)
+            PlaygroundView(mode: $mode)
                 .transition(.scale(0.5).combined(with: .opacity))
         } else if mode == .idea {
             IdeaView(mode: $mode)

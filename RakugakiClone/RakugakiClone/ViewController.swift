@@ -36,7 +36,7 @@ class ViewController: UIViewController, ARSessionDelegate, ARSCNViewDelegate {
     
     let context = CIContext()
     
-    var callback : ((Rakugaki) -> Void)?
+    var callback : ((Rakugaki, Tuya) -> Void)?
     
     //@IBOutlet weak var scnView: ARSCNView!
     var scnView: ARSCNView!
@@ -149,9 +149,10 @@ class ViewController: UIViewController, ARSessionDelegate, ARSCNViewDelegate {
         
         let origin = CGPoint(x: self.view.bounds.width/2 - self.detectSize/2,
                              y: self.view.bounds.height/2 - self.detectSize/2)
-        if let leftTopWorldPosition = self.getWorldPosition(from: origin) {
-            print("okok")
-        }
+        
+//        if let leftTopWorldPosition = self.getWorldPosition(from: origin) {
+//            print("okok")
+//        }
         
         // キャプチャ画像をスクリーンで見える範囲に切り抜く
         guard let screenImage = cropScreenImageFromCapturedImage(frame: frame) else {
@@ -219,7 +220,7 @@ class ViewController: UIViewController, ARSessionDelegate, ARSCNViewDelegate {
     }
     
     
-    func scan(callback: @escaping (Rakugaki) -> Void) {
+    func scan(callback: @escaping (Rakugaki, Tuya) -> Void) {
         self.callback = callback
         isButtonPressed = true
     }
@@ -423,7 +424,9 @@ extension ViewController {
     // レイキャストでワールド座標を取得
     private func getWorldPosition(from: CGPoint) -> SCNVector3? {
         
-        guard let query = self.scnView.raycastQuery(from: from, allowing: .existingPlaneGeometry, alignment: .horizontal),
+        guard let query = self.scnView.raycastQuery(from: from,
+                                                    allowing: .existingPlaneGeometry,
+                                                    alignment: .horizontal),
               let result = self.scnView.session.raycast(query).first else {
             return nil
         }
@@ -485,7 +488,8 @@ extension ViewController {
         self.cornerMarker4.worldPosition = rightBottomWorldPosition
         self.cornerMarker4.isHidden = false
         // 四隅の座標をワールド座標の中心を基準にした座標に変換
-        let worldCenter = (leftTopWorldPosition + rightTopWorldPosition + leftBottomWorldPosition + rightBottomWorldPosition) / 4
+        let worldCenter = (leftTopWorldPosition + rightTopWorldPosition +
+                           leftBottomWorldPosition + rightBottomWorldPosition) / 4
         self.leftTop = leftTopWorldPosition - worldCenter
         self.rightTop = rightTopWorldPosition - worldCenter
         self.leftBottom = leftBottomWorldPosition - worldCenter
@@ -528,7 +532,7 @@ extension ViewController {
         if from.y > from.x {
             // 四角形の上側の三角形
             let t: CGFloat = pl * pl / 2    // 四角形の上側の三角形の面積
-            let t2 = pl * (pl - from.y) / 2   // t2の面積
+            let t2 = pl * (pl - from.y) /  2   // t2の面積
             let t3 = pl * from.x / 2          // t3の面積
             let t1 = t - t2 - t3            // t1の面積
 
@@ -609,7 +613,27 @@ extension ViewController {
                                     _leftBottom: SIMD3<Float>(leftBottom),
                                     _rightTop: SIMD3<Float>(rightTop),
                                     _rightBottom: SIMD3<Float>(rightBottom))
-            callback(rakugaki)
+            
+            let serializablePath = Pathology.extract(path: geometryPath.cgPath)
+            
+            guard let pathJSONData = try? serializablePath.toJSON(options: JSONSerialization.WritingOptions(rawValue: 0)) else{
+                return node
+            }
+            
+            let tuya = Tuya(name: "",
+                            pathData: pathJSONData,
+                            imageData: imageData,
+                            textCoord: TextCoord(leftTop, leftBottom, rightTop, rightBottom),
+//                            leftTop: leftTop,
+//                            leftBottom: leftBottom,
+//                            rightTop: rightTop,
+//                            rightBottom: rightBottom
+                            timestamp: Date()
+            )
+            
+            print("textCoord: \(TextCoord(leftTop, leftBottom, rightTop, rightBottom))")
+            
+            callback(rakugaki, tuya)
             
         }
         print("return node")

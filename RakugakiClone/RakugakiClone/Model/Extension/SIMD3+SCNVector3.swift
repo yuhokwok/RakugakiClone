@@ -17,3 +17,8 @@ extension SIMD3<Float> {
     }
 }
 
+extension SCNVector3 {
+    var simd3f : SIMD3<Float> {
+        return SIMD3(x: self.x, y: self.y, z: self.z)
+    }
+}

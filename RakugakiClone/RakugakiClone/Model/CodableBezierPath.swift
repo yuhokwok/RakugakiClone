@@ -7,6 +7,7 @@
 
 import UIKit
 
+
 /// A simple wrapper around `UIBezierPath` that makes it Codable.
 /// Internally, it archives/unarchives a `UIBezierPath` via NSKeyedArchiver.
 struct CodableBezierPath: Codable {
