@@ -518,14 +518,55 @@ extension ViewController {
         return geometryPath
     }
     
+    func mapPoint(
+        _ point: CGPoint,
+        topLeft: CGPoint,
+        topRight: CGPoint,
+        bottomLeft: CGPoint,
+        bottomRight: CGPoint
+    ) -> CGPoint {
+        // 1) Convert (x, y) to normalized [0…1].
+        let u = point.x
+        let v = point.y
+        
+        // 2) Interpolate left/right edges at the “top” and “bottom”.
+        let topEdge = CGPoint(
+            x: topLeft.x + u * (topRight.x - topLeft.x),
+            y: topLeft.y + u * (topRight.y - topLeft.y)
+        )
+        let bottomEdge = CGPoint(
+            x: bottomLeft.x + u * (bottomRight.x - bottomLeft.x),
+            y: bottomLeft.y + u * (bottomRight.y - bottomLeft.y)
+        )
+        
+        // 3) Interpolate between topEdge and bottomEdge by v.
+        let x = topEdge.x + v * (bottomEdge.x - topEdge.x)
+        let y = topEdge.y + v * (bottomEdge.y - topEdge.y)
+        
+        return CGPoint(x: x, y: y)
+    }
+    
     private func convertPathPoint(_ from: CGPoint) -> CGPoint {
         
+//        guard let leftTop = self.leftTop,
+//              let rightTop = self.rightTop,
+//              let leftBottom = self.leftBottom,
+//              let rightBottom = self.rightBottom else {
+//            return CGPoint.zero
+//        }
         guard let leftTop = self.leftTop,
               let rightTop = self.rightTop,
               let leftBottom = self.leftBottom,
               let rightBottom = self.rightBottom else {
             return CGPoint.zero
         }
+        
+//        return self.mapPoint(from,
+//                             topLeft: CGPoint(x: leftTop.x.double, y: leftTop.z.double),
+//                             topRight: CGPoint(x: rightTop.x.double, y: rightTop.z.double),
+//                             bottomLeft: CGPoint(x: leftBottom.x.double, y: leftBottom.z.double),
+//                             bottomRight: CGPoint(x: rightBottom.x.double, y: rightBottom.z.double)) * self.tempGeometryScale
+        
         //　パスの各座標について三角形の重心座標系でワールド座標を導出
         var point = CGPoint.zero
         let pl: CGFloat = 1.0     // CGPathの一辺の長さ。VNContourの返す輪郭は(0,0)〜(1,1)の範囲

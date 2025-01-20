@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct ContentView: View {
-    @State var mode : AppMode = .start
+    @State var mode : AppMode = .playing
     var body: some View {
         if mode == .start || mode == .instruct {
             StartView(mode: $mode)
