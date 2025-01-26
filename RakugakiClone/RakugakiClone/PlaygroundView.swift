@@ -19,7 +19,7 @@ struct PlaygroundView: View {
     @Query private var tayuResults : [Tuya]
     
     @Binding var mode: AppMode
-    @State var showTip  = true
+    @State var showTip  = false
     
     @State var rakugakiArr : [Rakugaki] = []
     
@@ -40,7 +40,9 @@ struct PlaygroundView: View {
                     Button(action: {
                         withAnimation {
                             self.showTip.toggle()                        }
-                    }, label: { Text(showTip ? "Hide Tips" : "Show Tips") } )
+                    }, label: {
+                        Text(showTip ? "Hide Tips" : "Show Tips")
+                    } )
                     .buttonStyle(.borderedProminent)
                     Button(action: {
                         withAnimation {
@@ -48,7 +50,9 @@ struct PlaygroundView: View {
                         }
                     }, label: { Text("Close") } )
                     .buttonStyle(.bordered)
-                } .padding()
+                }
+                .padding()
+                .padding(.top, 20)
                 
                 if showTip {
                     HStack {
@@ -113,24 +117,34 @@ struct PlaygroundView: View {
                                                             Image(uiImage: image)
                                                                 .resizable()
                                                                 .scaledToFill()
-                                                                .frame(width: 100, height: 100)
-                                                        }.frame(width: 100, height: 100)
+                                                                .frame(width: 150, height: 150)
+                                                        }.frame(width: 150, height: 150)
                                                             .background(.white)
                                                             .clipShape(RoundedRectangle(cornerRadius: 15))
                                                             .shadow(radius: 10)
                                                         
                                                     })
                                                 } else {
-                                                    Rectangle().frame(width: 100, height: 100)
+                                                    Rectangle().frame(width: 150, height: 150)
                                                         .clipShape(RoundedRectangle(cornerRadius: 15))
                                                         .shadow(radius: 10)
                                                 }
                                                 
-                                                Button(action: {
-                                                    self.tuya = result
-                                                }, label: {
-                                                    Text("More")
-                                                })
+                                                VStack {
+                                                    Button(action: {
+                                                        delete(result)
+                                                    }, label: {
+                                                        Text("Delete")
+                                                    }).padding()
+                                                    
+                                                    Spacer()
+                                                    
+                                                    Button(action: {
+                                                        self.tuya = result
+                                                    }, label: {
+                                                        Text("More")
+                                                    }).padding()
+                                                }.frame(height: 150)
                                             }
                                             Text("\(result.name)")
                                         }
@@ -149,36 +163,7 @@ struct PlaygroundView: View {
                                 ViewController.shared?.scan(callback: {
                                     r, t in
                                     
-                                    //rakugakiArr.append(r)
-                                    var notOk = true
-                                    var index = 0
-                                    while notOk {
-
-                                        let fetchDescriptor = FetchDescriptor<Tuya>(predicate: #Predicate {
-                                            tuya in
-                                            if index == 0 {
-                                                return tuya.name.contains("Drawing")
-                                            } else {
-                                                return tuya.name.contains("Drawing \(index)")
-                                            }
-                                        })
-                                        
-                                        if let count = try? modelContext.fetchCount(fetchDescriptor) {
-                                            notOk = count > 0
-                                        } else {
-                                            notOk = false
-                                        }
-                                        
-                                        index += 1
-                                    }
-                                    
-                                    if index == 0 {
-                                        t.name = "Drawing"
-                                    } else {
-                                        t.name = "Drawing \(index)"
-                                    }
-                                    
-                                    modelContext.insert(t)
+                                    insertTuya(t)
                                 })
                                 
                                 //ViewController.shared?.pressButton(nil)
@@ -242,6 +227,45 @@ struct PlaygroundView: View {
         })
             .ignoresSafeArea()
     }
+    
+    func insertTuya(_ t : Tuya) {
+        //rakugakiArr.append(r)
+        var notOk = true
+        var index = 0
+        while notOk {
+
+            let fetchDescriptor = FetchDescriptor<Tuya>(predicate: #Predicate {
+                tuya in
+                if index == 0 {
+                    return tuya.name.contains("Drawing")
+                } else {
+                    return tuya.name.contains("Drawing \(index)")
+                }
+            })
+            
+            if let count = try? modelContext.fetchCount(fetchDescriptor) {
+                notOk = count > 0
+            } else {
+                notOk = false
+            }
+            
+            if notOk {
+                index += 1
+            }
+        }
+        
+        if index == 0 {
+            t.name = "Drawing"
+        } else {
+            t.name = "Drawing \(index)"
+        }
+        
+        modelContext.insert(t)
+    }
+    
+    func delete(_ t : Tuya) {
+        modelContext.delete(t)
+    }
 
     func makeScene(with tuya : Tuya) -> SCNScene {
         let scene = SCNScene()
@@ -249,6 +273,7 @@ struct PlaygroundView: View {
         var tuyaNode : SCNNode? = nil
         if let node = tuya.makeNode(false) {
             scene.rootNode.addChildNode(node)
+            node.scale = SCNVector3(x: 10, y: 10, z: 10)
             tuyaNode = node
         }
 
@@ -309,6 +334,8 @@ struct ShareSheet: UIViewControllerRepresentable {
 
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
+
+
 
 #Preview {
     PlaygroundView(mode: .constant(.playing))

@@ -224,13 +224,25 @@ extension Tuya {
         let context = CIContext(options: nil)
         
         if let extractedImage = extractedImage, let ciExtractedImage = CIImage(image: extractedImage),
-            let clipped = ciExtractedImage.clippedToNonTransparent(),
-            let theTexture = context.createCGImage(clipped, from: clipped.extent)  {
+            let clipped = ciExtractedImage.clippedToNonTransparent() {
 
-            guard let shapeFaceNodeG = makeShapeFaceNodeG(geometryPath: path, texture: theTexture) else { return nil }
-            //shapeFaceNode.eulerAngles = SCNVector3(x: Float.pi/2, y: 0, z: 0)
-            shapeFaceNodeG.position = SCNVector3(0, 0.0, 0.0051) // 表面の位置になるように座標を調整
-            node.addChildNode(shapeFaceNodeG)
+            let whiteBackground = CIImage(color: CIColor(red: 1, green: 1, blue: 1))
+                .cropped(to: clipped.extent)
+            
+            let filter = CIFilter.sourceAtopCompositing()
+            filter.inputImage = clipped
+            filter.backgroundImage = whiteBackground
+            
+            
+            if let output = filter.outputImage,
+                let theTexture = context.createCGImage(output, from: output.extent) {
+                guard let shapeFaceNodeG = makeShapeFaceNodeG(geometryPath: path, texture: theTexture) else { return nil }
+                //shapeFaceNode.eulerAngles = SCNVector3(x: Float.pi/2, y: 0, z: 0)
+                shapeFaceNodeG.position = SCNVector3(0, 0.0, 0.0051) // 表面の位置になるように座標を調整
+                node.addChildNode(shapeFaceNodeG)
+            }
+            
+            
             
         }
         
@@ -325,7 +337,7 @@ extension Tuya {
             geometry.materials = [matrial]
         } else {
             let material = SCNMaterial()
-            material.diffuse.contents = UIColor.lightGray
+            material.diffuse.contents = UIColor.darkGray
             geometry.materials = [material]
             node.geometry = geometry
         }

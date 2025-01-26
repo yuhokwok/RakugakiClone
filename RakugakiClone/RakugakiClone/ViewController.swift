@@ -47,7 +47,7 @@ class ViewController: UIViewController, ARSessionDelegate, ARSCNViewDelegate {
     // 輪郭描画用
     private var contourPathLayer: CAShapeLayer?
     // キャプチャ画像上の輪郭検出範囲
-    private let detectSize: CGFloat = 480.0
+    private let detectSize: CGFloat = 380.0
     // ３次元化ボタンが押下状態
     private var isButtonPressed = false
     // 床の厚さ(m)
@@ -518,6 +518,19 @@ extension ViewController {
         return geometryPath
     }
     
+    func mapPoint(_ pt : CGPoint, minX : Double, maxX : Double, minY : Double, maxY: Double) -> CGPoint {
+        let x = mapToRange(value: pt.x, min: minX, max: maxX, targetMin: minX, targetMax: maxX)
+        let y = mapToRange(value: pt.y, min: minY, max: maxY, targetMin: minY, targetMax: maxY)
+        return CGPoint(x: x, y: y)
+    }
+    
+    func mapToRange(value: Double, min: Double, max: Double, targetMin: Double, targetMax: Double) -> Double {
+        // Calculate the scale factor
+        let scale = (targetMax - targetMin) / (max - min)
+        // Map the value to the target range
+        return targetMin + (value - min) * scale
+    }
+    
     func mapPoint(
         _ point: CGPoint,
         topLeft: CGPoint,
@@ -548,12 +561,6 @@ extension ViewController {
     
     private func convertPathPoint(_ from: CGPoint) -> CGPoint {
         
-//        guard let leftTop = self.leftTop,
-//              let rightTop = self.rightTop,
-//              let leftBottom = self.leftBottom,
-//              let rightBottom = self.rightBottom else {
-//            return CGPoint.zero
-//        }
         guard let leftTop = self.leftTop,
               let rightTop = self.rightTop,
               let leftBottom = self.leftBottom,
